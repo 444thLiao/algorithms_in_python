@@ -28,5 +28,6 @@ def predict(sample,P_l_f_dict,P_label_dict):
 
 
 if __name__ == '__main__':
+
     P_l_f_dict, P_label_dict = pre_process_sample(sample,labels)
 
