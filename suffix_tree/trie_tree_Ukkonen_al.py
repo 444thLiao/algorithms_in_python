@@ -35,6 +35,7 @@ class Node(object):
     def add_parent(self, node):
         self.parent = node
 
+
     def drop_son(self, node):
         if node in self.son:
             self.son.remove(node)
@@ -43,6 +44,8 @@ class Node(object):
         return self.son
 
     def get_parent(self):
+        if self.text == '':
+            return self
         return self.parent
 
     def change_text(self, new_text):
@@ -57,14 +60,32 @@ class dict_tree(object):
         self.active_point = [self.root, '', 0]
         self.remainder = 0
         # self.nodes = []
+
     def get_current_pnode(self):
         return self.active_point[0]
+
     def get_active_edge(self):
         return self.active_point[1]
+
     def get_last_pos(self):
         return self.active_point[2]
 
     def get_all_nodes(self, pnode=''):
+        # recursive get all nodes
+        nodes = []
+        if not pnode:
+            pnode = self.root
+
+        for snode in pnode.get_son():
+            nodes.append(snode)
+        if pnode.get_son():
+            # if exist son, it is not a leaf
+            for snode in pnode.get_son():
+                nodes += self.get_all_nodes(snode)
+        return nodes
+
+
+    def get_DOT_graph(self, pnode=''):
         # recursive get all nodes
         nodes = []
         if not pnode:
@@ -76,6 +97,12 @@ class dict_tree(object):
             for snode in pnode.get_son():
                 nodes += self.get_all_nodes(snode)
         return nodes
+
+    def get_leaf(self):
+        leaf = [_node
+                for _node in self.get_all_nodes()
+                if not _node.get_son()]  # find all leaf nodes
+        return leaf
 
     ## ukkonen part
     def split_branch(self, node, letter):
@@ -94,43 +121,40 @@ class dict_tree(object):
 
     def active_point_return_node(self, checked_letter):
         current_parent_node = self.get_current_pnode()
-        existed_string = self.get_active_edge()
+        active_edge = self.get_active_edge()
         last_pos = self.get_last_pos()
-        if existed_string:
-            removed_short_nodes = [son
-                                   for son in current_parent_node.get_son()
-                                   if len(son.text) > last_pos]
-            if not removed_short_nodes:
-                check_nodes = current_parent_node
-            else:
-                if not current_parent_node.text:
-                    # current_parent_node is root
-                    check_nodes = [son
-                                   for son in removed_short_nodes
-                                   if checked_letter[:-1] == son.text[:last_pos]]
-                    if check_nodes:
-                        check_nodes = check_nodes[0]
-                    else:
-                        check_nodes = current_parent_node
+        potential_nodes = [son
+                           for son in current_parent_node.get_son()
+                           if len(son.text) > last_pos]
+        if active_edge:
+            if not current_parent_node.text:
+                # current_parent_node is root
+                check_nodes = [son
+                               for son in potential_nodes
+                               if checked_letter[:-1] == son.text[:last_pos]]
+                if check_nodes:
+                    check_nodes = check_nodes[0]
                 else:
-                    parent_nodes_pos = checked_letter.rindex(current_parent_node.text)
-                    parent_nodes_pos_right = parent_nodes_pos + len(current_parent_node.text)
-                    # check if is a node which contains checked_letter
-                    check_nodes = [son
-                                   for son in removed_short_nodes
-                                   if checked_letter[parent_nodes_pos_right:-1] == son.text[:last_pos]]
-                    if check_nodes:
-                        check_nodes = check_nodes[0]
-                    else:
-                        check_nodes = current_parent_node
+                    check_nodes = current_parent_node
+            else:
+                parent_nodes_pos = checked_letter.rindex(current_parent_node.text)
+                parent_nodes_pos_right = parent_nodes_pos + len(current_parent_node.text)
+                # check if is a node which contains checked_letter
+                check_nodes = [son
+                               for son in potential_nodes
+                               if checked_letter[parent_nodes_pos_right:-1] == son.text[:last_pos]]
+                if check_nodes:
+                    check_nodes = check_nodes[0]
+                else:
+                    check_nodes = current_parent_node
         else:
-            check_nodes = active_point[0]
+            check_nodes = self.get_current_pnode()
         # print 'accept: active_point to locate:',active_point,check_nodes
         return check_nodes
 
-    def check_exist(active_point, checked_letter):
+    def check_exist(self, checked_letter):
         # get former node.
-        check_nodes = active_point_return_node(active_point, checked_letter)
+        check_nodes = self.active_point_return_node(checked_letter)
         if not check_nodes.get_son():
             poss_check_nodes = [check_nodes.text]
         else:
@@ -140,38 +164,46 @@ class dict_tree(object):
                 return True
 
     def construct_suffixtree_ukkonen(self, word):
-
-
+        active_edge = self.get_active_edge()
+        current_pnode = self.get_current_pnode()
+        last_pos = self.get_last_pos()
         for idx, letter in enumerate(word):
-
-            # print letter,active_point
-            remainder += 1
+            # expand the remained branch, prepare to insert a new branch
+            self.remainder += 1
             if not self.root.get_son():
-                self.root.add_son(Node(letter))  # init the first node.
-                remainder -= 1
+                # 0. first letter
+                # first letter, brand new start.
+                # beyond doubt
+                self.root.add_son(Node(letter))
+                self.remainder -= 1
             else:
-                all_last_node = [_node for _node in self.get_all_nodes() if not _node.get_son()]  # find all leaf nodes
-                for node in all_last_node:
-                    node.change_text(node.text + letter)  # expand each line.
-                checked_letter = active_point[1] + letter
-
-                if not check_exist(active_point, checked_letter):  # check current 'active_edge + letter' is a existed prefix or not?
+                # 1. expanding leaf nodes
+                # without any doubt, we first expand the existing leaf with given letter
+                leaf_nodes = self.get_leaf()
+                for node in leaf_nodes:
+                    assert isinstance(node, Node)
+                    node.change_text(node.text + letter)
+                # 2.
+                checked_letter = active_edge + letter
+                if not self.check_exist(checked_letter):
+                    # check current 'active_edge + letter' is a existed prefix or not?
                     splited_node = []
-                    while remainder > 1:
-                        print('implictly', remainder, active_point, letter)
+                    while self.remainder > 1:
+                        print("not found existing path")
+                        print('implictly', self.remainder, letter,self.active_point)
                         # node = self.prefix_to_locate(active_point[1])
-                        added_node = active_point_return_node(active_point, checked_letter)
-                        node_sp = split_merge(active_point, added_node, letter)
-                        remainder -= 1
-                        if active_point[0] == self.root and not active_point[0].suffix_link:
-                            active_point[0] = self.root
-                            active_point[2] -= 1
-                        elif active_point[0] != self.root and not active_point[0].suffix_link:
-                            active_point[0] = self.root
+                        added_node = self.active_point_return_node( checked_letter)
+                        node_sp = self.split_branch(added_node, letter)
+                        self.remainder -= 1
+                        if current_pnode == self.root and not current_pnode.suffix_link:
+                            current_pnode = self.root
+                            last_pos -= 1
+                        elif current_pnode != self.root and not current_pnode.suffix_link:
+                            current_pnode = self.root
                         else:
-                            active_point[0] = active_point[0].suffix_link
+                            current_pnode = current_pnode.suffix_link
 
-                        active_point[1] = checked_letter[1:]
+                        active_edge = checked_letter[1:]
                         checked_letter = checked_letter[1:]
                         # new_idx_for_node = active_point_return_node(active_point)
 
@@ -179,19 +211,19 @@ class dict_tree(object):
                             splited_node[-1].link_suffix(node_sp)
                         splited_node.append(node_sp)
 
-                    active_point[0].add_son(Node(letter))  # add new branch in root
+                    current_pnode.add_son(Node(letter))  # add new branch in root
                     # active_point[2] -= 1
-                    if remainder == 1:
+                    if self.remainder == 1:
                         active_point = [self.root, '', 0]
-                        remainder -= 1
+                        self.remainder -= 1
 
                 else:
-                    print('find existed word')
-                    node = self.get_node_lineage(checked_letter)[-1]  # find nodes which have these word.
-                    ac_p = node
-                    active_point[0] = ac_p.get_parent()
-                    active_point[1] = checked_letter
-                    active_point[2] = ac_p.text.index(letter) + 1
+                    node = self.get_node_lineage(checked_letter)[-1]
+                    print('find existed word', checked_letter,node.text,self.active_point)
+                    # find nodes which have these word.
+                    self.active_point[0] = node.get_parent()
+                    self.active_point[1] = checked_letter
+                    self.active_point[2] = node.text.index(letter) + 1
 
     def get_node_lineage(self, lineage_text):
         lineages = []
