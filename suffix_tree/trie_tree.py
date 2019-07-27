@@ -20,7 +20,7 @@ class Node(object):
             else:
                 return False
         else:
-            raise IOError,'Wrong compare.'
+            raise IOError('Wrong compare.')
     def add_son(self,node):
         self.son.append(node)
         node.add_parent(self)
@@ -94,12 +94,12 @@ class dict_tree(object):
                     break
             if not current_parent:
                 import pdb;pdb.set_trace()
-                raise IOError,'Wrong lineage.'
+                raise IOError('Wrong lineage.')
 
         #import pdb;pdb.set_trace()
         if current_parent.get_son() and len(lineage_text) != 0:
             if Node(lineage_text) not in current_parent.get_son():
-                raise IOError, 'Wrong lineage.'
+                raise IOError( 'Wrong lineage.')
             current_node = [son for son in current_parent.get_son() if son == Node(lineage_text)][0]
             return current_node
         elif len(lineage_text) == 0:
@@ -144,7 +144,7 @@ class dict_tree(object):
                             lineage.append(next_node)
                             break
                     if not next_node:
-                        raise IOError, "The lineage doesn't exist in sons of root."
+                        raise IOError("The lineage doesn't exist in sons of root.")
                     lineage_text = lineage_text[len(poss_pre):]
                     if not lineage_text:
                         break
@@ -179,7 +179,7 @@ class dict_tree(object):
             if 'succeed' not in status:
                 break
         self.compressed = True
-        print 'Tree has been compressed.'
+        print('Tree has been compressed.')
 
 
 
@@ -212,4 +212,4 @@ if __name__=='__main__':
     trie.compressed_self()
     #trie.get_all_nodes()
     for word in trie.get_all_aft_words(''):
-        print trie.get_node_lineage(word)
+        print(trie.get_node_lineage(word))
